@@ -1,0 +1,269 @@
+#!/bin/bash
+
+# setup_ansible_files.sh
+# This script creates all necessary Ansible configuration files
+
+# Exit on any error
+set -e
+
+# Print commands before executing
+set -x
+
+# Base directory for Ansible
+BASE_DIR="ansible_base"
+
+# Function to create a directory if it doesn't exist
+create_dir() {
+    if [ ! -d "$1" ]; then
+        mkdir -p "$1"
+        echo "Created directory: $1"
+    fi
+}
+
+# Function to create a file with content
+create_file() {
+    local file_path="$1"
+    local content="$2"
+    
+    # Create directory if it doesn't exist
+    local dir_path=$(dirname "$file_path")
+    create_dir "$dir_path"
+    
+    # Create file with content
+    echo "$content" > "$file_path"
+    echo "Created file: $file_path"
+}
+
+# First, create all necessary directories
+echo "Creating directory structure..."
+
+# Create base directories
+create_dir "$BASE_DIR/inventory/dev"
+create_dir "$BASE_DIR/inventory/prod"
+create_dir "$BASE_DIR/group_vars/all"
+create_dir "$BASE_DIR/group_vars/webservers"
+create_dir "$BASE_DIR/group_vars/dbservers"
+create_dir "$BASE_DIR/host_vars"
+create_dir "$BASE_DIR/roles"
+create_dir "$BASE_DIR/playbooks"
+create_dir "$BASE_DIR/templates"
+create_dir "$BASE_DIR/files"
+create_dir "$BASE_DIR/vars"
+
+# Create role directories - THIS IS THE IMPORTANT NEW PART
+for role in common docker security monitoring backup; do
+    create_dir "$BASE_DIR/roles/$role/tasks"
+    create_dir "$BASE_DIR/roles/$role/handlers"
+    create_dir "$BASE_DIR/roles/$role/templates"
+    create_dir "$BASE_DIR/roles/$role/files"
+    create_dir "$BASE_DIR/roles/$role/vars"
+    create_dir "$BASE_DIR/roles/$role/defaults"
+    create_dir "$BASE_DIR/roles/$role/meta"
+done
+
+create_file() {
+    local file_path="$1"
+    local content="$2"
+    echo "$content" > "$file_path"
+    echo "Created file: $file_path"
+}
+
+# Create ansible.cfg
+create_file "$BASE_DIR/ansible.cfg" "[defaults]
+inventory = inventory/dev
+remote_user = ubuntu
+host_key_checking = False
+roles_path = roles
+deprecation_warnings = False
+
+[ssh_connection]
+pipelining = True
+ssh_args = -o ControlMaster=auto -o ControlPersist=30m"
+
+# Create README.md
+create_file "$BASE_DIR/README.md" "# Ansible Configuration for Infrastructure Management
+
+This directory contains the Ansible configuration for managing our infrastructure.
+
+## Directory Structure
+- inventory/: Environment-specific inventory files
+- group_vars/: Variables for groups of servers
+- host_vars/: Host-specific variables
+- roles/: Reusable roles for server configuration
+- playbooks/: Main playbooks
+- templates/: Jinja2 templates
+- files/: Static files
+- vars/: Global variables"
+
+# Create inventory files
+create_file "$BASE_DIR/inventory/dev/hosts" "[webservers]
+# Add development web servers here
+# web-dev-1 ansible_host=10.0.1.10
+
+[dbservers]
+# Add development database servers here
+# db-dev-1 ansible_host=10.0.1.20
+
+[all:vars]
+env=dev"
+
+create_file "$BASE_DIR/inventory/prod/hosts" "[webservers]
+# Add production web servers here
+# web-prod-1 ansible_host=10.0.2.10
+
+[dbservers]
+# Add production database servers here
+# db-prod-1 ansible_host=10.0.2.20
+
+[all:vars]
+env=prod"
+
+# Create group variables
+create_file "$BASE_DIR/group_vars/all/common.yml" "---
+# Common variables for all servers
+timezone: UTC
+ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+
+# Security settings
+ssh_port: 22
+allowed_ssh_users:
+  - ubuntu
+  - admin
+
+# Package management
+update_cache: yes
+upgrade_packages: yes"
+
+create_file "$BASE_DIR/group_vars/webservers/main.yml" "---
+# Variables for web servers
+http_port: 80
+https_port: 443
+
+# Docker configuration
+docker_users:
+  - ubuntu
+docker_compose_version: "2.21.0""
+
+create_file "$BASE_DIR/group_vars/dbservers/main.yml" "---
+# Variables for database servers
+backup_enabled: yes
+backup_frequency: daily
+backup_retention_days: 7"
+
+# Create main playbook
+create_file "$BASE_DIR/playbooks/site.yml" "---
+- name: Configure all servers
+  hosts: all
+  become: yes
+  roles:
+    - common
+    - security
+    - monitoring
+
+- name: Configure web servers
+  hosts: webservers
+  become: yes
+  roles:
+    - docker
+
+- name: Configure database servers
+  hosts: dbservers
+  become: yes
+  roles:
+    - backup"
+
+# Create role files
+for role in common docker security monitoring backup; do
+    # Create main task file
+    create_file "$BASE_DIR/roles/$role/tasks/main.yml" "---
+# Main tasks for $role role
+"
+
+    # Create handlers
+    create_file "$BASE_DIR/roles/$role/handlers/main.yml" "---
+# Handlers for $role role
+"
+
+    # Create default variables
+    create_file "$BASE_DIR/roles/$role/defaults/main.yml" "---
+# Default variables for $role role
+"
+
+    # Create meta information
+    create_file "$BASE_DIR/roles/$role/meta/main.yml" "---
+galaxy_info:
+  author: Your Name
+  description: $role role for server configuration
+  license: MIT
+  min_ansible_version: 2.9
+"
+done
+
+# Create common role tasks
+create_file "$BASE_DIR/roles/common/tasks/main.yml" "---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+
+- name: Upgrade all packages
+  apt:
+    upgrade: yes
+  when: ansible_os_family == 'Debian'
+
+- name: Install common packages
+  apt:
+    name:
+      - vim
+      - curl
+      - git
+      - htop
+      - ntp
+    state: present
+  when: ansible_os_family == 'Debian'"
+
+# Create docker role tasks
+create_file "$BASE_DIR/roles/docker/tasks/main.yml" "---
+- name: Install Docker dependencies
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - software-properties-common
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add Docker repository
+  apt_repository:
+    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install Docker
+  apt:
+    name: docker-ce
+    state: present
+    update_cache: yes
+  when: ansible_os_family == 'Debian'"
+
+# Set appropriate permissions
+find "$BASE_DIR" -type d -exec chmod 755 {} \;
+find "$BASE_DIR" -type f -exec chmod 644 {} \;
+chmod +x "$0"
+
+echo "Ansible files setup complete!"
+echo "Next steps:"
+echo "1. Review and customize the created files"
+echo "2. Update inventory files with your server IPs"
+echo "3. Review and modify group variables as needed"
+echo "4. Begin implementing specific role tasks"
