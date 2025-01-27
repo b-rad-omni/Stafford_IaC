@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Name of the project"
   type        = string
-  default     = "Django_resume"
+  
 }
 
 # Additional production-specific variables
@@ -27,5 +27,10 @@ variable "environment" {
   type = string
   default = "prod"
 
+
+}
+
+variable "key_name" {
+  type = string
 
 }

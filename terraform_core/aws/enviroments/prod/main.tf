@@ -11,14 +11,14 @@ provider "aws" {
   }
 }
 
-# Now configure the production environment using the shared module
+# Utilizing shared module refer to terraform.tfvars.example
 module "prod_environment" {
   source = "../shared"
 
-  # Pass the required variables from shared module
+  
   project_name = var.project_name
   aws_region   = var.aws_region
-  environment = var.environment
+  environment = "prod"
 
   # Network configuration
   vpc_cidr           = "10.1.0.0/16" # Different from dev's 10.0.0.0/16
@@ -28,5 +28,5 @@ module "prod_environment" {
 
   # Instance configuration
   instance_type = "t2.micro"
-  key_name      = "prod-key"
+  key_name      = var.key_name
 }

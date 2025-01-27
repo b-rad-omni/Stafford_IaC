@@ -1,14 +1,12 @@
-# infrastructure_core/aws/environments/shared/backend.tf
-# Current local state configuration
-# Note: When you're ready to migrate to S3:
-# 1. Rename backend.tf.s3 to backend.tf
-# 2. Configure the S3 bucket details
-# 3. Run: terraform init -migrate-state
+# infrastructure_core/aws/environments/shared/backend.tf.s3
+# This is a template file for future S3 backend configuration
+# Rename to backend.tf when ready to use S3 backend
 
 terraform {
-  # Using local backend (this is the default)
-  backend "local" {
-    # By default, state file will be named 'terraform.tfstate'
-    # and stored in the current directory
+  backend "s3" {
+    # bucket         = "your-terraform-state-bucket"
+    # key            = "shared/terraform.tfstate"
+    # region         = "us-east-1"
+    # dynamodb_table = "terraform-state-lock"
   }
 }
